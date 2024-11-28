@@ -6,13 +6,13 @@ from streamlit_folium import st_folium
 # 데이터 경로
 file_paths = {
     "대전 경계선": 'https://raw.githubusercontent.com/cdshadow/facility/main/daejeon_line.shp',
-    "1인 가구 그리드": 'https://raw.githubusercontent.com/cdshadow/facility/main/one_person_grid.shp',
+    "1인 가구 격자": 'https://raw.githubusercontent.com/cdshadow/facility/main/one_person_grid.shp',
 }
 
-# 마커 색상 및 스타일 설정
+# 마커 색상 설정 (폴리곤의 색상과 투명도 포함)
 layer_styles = {
-    "대전 경계선": {"color": "blue", "weight": 2},  # 라인 스타일
-    "1인 가구 그리드": {"color": "green", "fill_opacity": 0.5},  # 폴리곤 스타일
+    "대전 경계선": {"color": "blue", "weight": 2, "fill_color": "lightblue", "fill_opacity": 0.2},
+    "1인 가구 격자": {"color": "green", "weight": 1, "fill_color": "lightgreen", "fill_opacity": 0.4},
 }
 
 # Streamlit 설정
@@ -23,7 +23,7 @@ def create_map():
     # Folium 지도 설정 (대전광역시 중심)
     map_obj = folium.Map(
         location=[36.3504, 127.3845],
-        zoom_start=12,  # 줌 레벨 조정
+        zoom_start=12,
     )
 
     # 파일 추가
@@ -37,22 +37,20 @@ def create_map():
                 # FeatureGroup 생성
                 feature_group = folium.FeatureGroup(name=name)
 
-                # 파일에 따라 다르게 처리
-                if name == "대전 경계선":
-                    # LineString 또는 MultiLineString 처리
-                    for _, row in gdf.iterrows():
-                        folium.PolyLine(
-                            locations=[list(coord[::-1]) for coord in row.geometry.coords],
-                            color=layer_styles[name]["color"],
-                            weight=layer_styles[name]["weight"],
-                        ).add_to(feature_group)
-                elif name == "1인 가구 그리드":
-                    # Polygon 또는 MultiPolygon 처리
-                    for _, row in gdf.iterrows():
+                # 각 지오메트리를 지도에 추가
+                for _, row in gdf.iterrows():
+                    # 폴리곤과 라인 처리
+                    if row.geometry.geom_type in ["Polygon", "MultiPolygon"]:
                         folium.GeoJson(
-                            data=row.geometry,
-                            style_function=lambda x: layer_styles[name],
-                            tooltip="Grid 정보",
+                            row.geometry,
+                            style_function=lambda x, s=layer_styles.get(name, {}): s,
+                            tooltip=folium.GeoJsonTooltip(fields=list(gdf.columns), aliases=list(gdf.columns)),
+                        ).add_to(feature_group)
+                    elif row.geometry.geom_type in ["LineString", "MultiLineString"]:
+                        folium.GeoJson(
+                            row.geometry,
+                            style_function=lambda x, s=layer_styles.get(name, {}): s,
+                            tooltip=folium.GeoJsonTooltip(fields=list(gdf.columns), aliases=list(gdf.columns)),
                         ).add_to(feature_group)
 
                 # FeatureGroup을 지도에 추가
@@ -68,7 +66,7 @@ def create_map():
     return map_obj
 
 # Streamlit 레이아웃 설정
-st.title('대전광역시 데이터 지도')
+st.title('대전광역시 지도 시각화')
 
 # 지도 생성 및 출력
 map_display = create_map()
