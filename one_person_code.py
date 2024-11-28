@@ -14,7 +14,7 @@ def load_shapefile(file_path):
 # 업로드된 파일 표시
 st.sidebar.title("Shapefile Files")
 uploaded_files = {
-    "One Person (one_person.shp)": "one_person.shp",
+    "One Person (one_person_grid.shp)": "one_person_grid.shp",
     "Daejeon (daejoen.shp)": "daejoen.shp"
 }
 
