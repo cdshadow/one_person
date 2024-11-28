@@ -3,71 +3,39 @@ import geopandas as gpd
 import folium
 from streamlit_folium import st_folium
 
-# 데이터 경로
-file_paths = {
-    "대전 경계선": 'https://raw.githubusercontent.com/cdshadow/facility/main/daejeon_line.shp',
-    "1인 가구 격자": 'https://raw.githubusercontent.com/cdshadow/facility/main/one_person_grid.shp',
+# Streamlit 애플리케이션 설정
+st.title("Shapefile Viewer")
+
+# Shapefile 파일 로드
+@st.cache_data
+def load_shapefile(file_path):
+    return gpd.read_file(file_path)
+
+# 업로드된 파일 표시
+st.sidebar.title("Shapefile Files")
+uploaded_files = {
+    "One Person (one_person.shp)": "one_person.shp",
+    "Daejeon (daejoen.shp)": "daejoen.shp"
 }
 
-# 마커 색상 설정 (폴리곤의 색상과 투명도 포함)
-layer_styles = {
-    "대전 경계선": {"color": "blue", "weight": 2, "fill_color": "lightblue", "fill_opacity": 0.2},
-    "1인 가구 격자": {"color": "green", "weight": 1, "fill_color": "lightgreen", "fill_opacity": 0.4},
-}
+selected_file = st.sidebar.selectbox("Select a Shapefile", list(uploaded_files.keys()))
 
-# Streamlit 설정
-st.set_page_config(layout="wide")
-
-# Folium 지도 생성 함수
-def create_map():
-    # Folium 지도 설정 (대전광역시 중심)
-    map_obj = folium.Map(
-        location=[36.3504, 127.3845],
-        zoom_start=12,
-    )
-
-    # 파일 추가
-    for name, path in file_paths.items():
-        try:
-            if path.endswith('.shp'):
-                # 쉐이프파일 처리
-                gdf = gpd.read_file(path)
-                gdf = gdf.to_crs(epsg=4326)  # 좌표계 변환
-
-                # FeatureGroup 생성
-                feature_group = folium.FeatureGroup(name=name)
-
-                # 각 지오메트리를 지도에 추가
-                for _, row in gdf.iterrows():
-                    # 폴리곤과 라인 처리
-                    if row.geometry.geom_type in ["Polygon", "MultiPolygon"]:
-                        folium.GeoJson(
-                            row.geometry,
-                            style_function=lambda x, s=layer_styles.get(name, {}): s,
-                            tooltip=folium.GeoJsonTooltip(fields=list(gdf.columns), aliases=list(gdf.columns)),
-                        ).add_to(feature_group)
-                    elif row.geometry.geom_type in ["LineString", "MultiLineString"]:
-                        folium.GeoJson(
-                            row.geometry,
-                            style_function=lambda x, s=layer_styles.get(name, {}): s,
-                            tooltip=folium.GeoJsonTooltip(fields=list(gdf.columns), aliases=list(gdf.columns)),
-                        ).add_to(feature_group)
-
-                # FeatureGroup을 지도에 추가
-                feature_group.add_to(map_obj)
-            else:
-                st.error(f"지원되지 않는 파일 형식입니다: {path}")
-        except Exception as e:
-            st.error(f"{name} 데이터를 불러오는 중 오류가 발생했습니다: {e}")
-
-    # 레이어 컨트롤 추가
-    folium.LayerControl(position='topleft').add_to(map_obj)
-
-    return map_obj
-
-# Streamlit 레이아웃 설정
-st.title('대전광역시 지도 시각화')
-
-# 지도 생성 및 출력
-map_display = create_map()
-st_folium(map_display, width=1200, height=700)
+if selected_file:
+    file_path = uploaded_files[selected_file]
+    gdf = load_shapefile(file_path)
+    
+    # Shapefile 데이터 요약 정보
+    st.subheader(f"{selected_file} - Metadata")
+    st.write(gdf.head())
+    
+    # 지도 시각화
+    st.subheader("Map View")
+    centroid = gdf.geometry.centroid
+    if not centroid.is_empty.all():
+        map_center = [centroid.y.mean(), centroid.x.mean()]
+    else:
+        map_center = [36.35, 127.38]  # 대전 임의 중심
+    
+    m = folium.Map(location=map_center, zoom_start=12)
+    folium.GeoJson(gdf).add_to(m)
+    st_folium(m, width=700, height=500)
